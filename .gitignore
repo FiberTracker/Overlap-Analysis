@@ -1,0 +1,5 @@
+.env
+fcc_data/
+overlap_results.json
+__pycache__/
+*.pyc
