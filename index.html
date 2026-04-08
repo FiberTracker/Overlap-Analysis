@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Access Required</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#f8fafc; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; }
+  .gate { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:40px 48px; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.06); max-width:400px; }
+  h1 { font-size:1.1rem; font-weight:700; color:#1a1a1a; margin-bottom:4px; }
+  .sub { font-size:0.75rem; color:#9ca3af; margin-bottom:24px; }
+  input { width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:6px; font-size:0.9rem; text-align:center; letter-spacing:4px; outline:none; }
+  input:focus { border-color:#374151; box-shadow:0 0 0 2px rgba(55,65,81,0.1); }
+  button { width:100%; margin-top:12px; padding:10px; background:#1a1a1a; color:#fff; border:none; border-radius:6px; font-size:0.82rem; font-weight:600; cursor:pointer; }
+  button:hover { background:#374151; }
+  .err { color:#dc2626; font-size:0.72rem; margin-top:8px; display:none; }
+  .badge { display:inline-block; background:#dc2626; color:#fff; font-size:0.55rem; padding:1px 7px; border-radius:2px; font-weight:700; letter-spacing:0.5px; margin-bottom:16px; }
+</style>
+</head>
+<body>
+<div class="gate">
+  <div class="badge">CONFIDENTIAL</div>
+  <h1>VZ / Charter Overlap Analysis</h1>
+  <div class="sub">Enter access code to continue</div>
+  <form onsubmit="return checkAccess()">
+    <input type="password" id="pw" placeholder="Code" autofocus>
+    <button type="submit">Access</button>
+  </form>
+  <div class="err" id="err">Incorrect code</div>
+</div>
+<script>
+function checkAccess() {
+  var pw = document.getElementById('pw').value;
+  // Simple hash check
+  if (pw === atob('MjAyNg==')) {
+    sessionStorage.setItem('auth','1');
+    window.location.href = 'dashboard.html';
+  } else {
+    document.getElementById('err').style.display = 'block';
+  }
+  return false;
+}
+// Auto-redirect if already authed
+if (sessionStorage.getItem('auth') === '1') window.location.href = 'dashboard.html';
+</script>
+</body>
+</html>

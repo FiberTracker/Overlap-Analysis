@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>if(sessionStorage.getItem("auth")!=="1")window.location.href="index.html";</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verizon / Charter: Regulatory Overlap Analysis</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#fff; color:#1a1a1a; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.5; }
+  .container { max-width:1480px; margin:0 auto; padding:16px 24px; }
+
+  /* Header */
+  .header { border-bottom:2px solid #1a1a1a; padding-bottom:8px; margin-bottom:16px; }
+  h1 { font-size:1.4rem; font-weight:700; color:#1a1a1a; }
+  .subtitle { color:#6b7280; font-size:0.78rem; margin-top:2px; }
+  .badge { display:inline-block; background:#dc2626; color:#fff; font-size:0.58rem; padding:1px 7px; border-radius:2px; font-weight:700; letter-spacing:0.5px; vertical-align:middle; margin-left:8px; }
+
+  /* Summary strip */
+  .strip { display:flex; gap:0; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:16px; overflow:hidden; background:#fff; }
+  .strip-item { flex:1; padding:12px 14px; border-right:1px solid #e5e7eb; }
+  .strip-item:last-child { border-right:none; }
+  .strip-label { font-size:0.62rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.6px; font-weight:600; }
+  .strip-val { font-size:1.3rem; font-weight:700; }
+  .strip-sub { font-size:0.68rem; color:#9ca3af; }
+
+  /* National map */
+  .national-map { width:100%; height:520px; border-radius:6px; border:1px solid #d1d5db; margin-bottom:8px; }
+
+  /* Metro map sections */
+  .metro-section { margin:28px 0 0; page-break-inside:avoid; }
+  .metro-header { display:flex; align-items:baseline; gap:12px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #e5e7eb; }
+  .metro-title { font-size:1.05rem; font-weight:700; color:#1a1a1a; }
+  .metro-stats { font-size:0.72rem; color:#6b7280; }
+  .metro-stats span { font-weight:700; }
+  .metro-map { width:100%; height:480px; border-radius:6px; border:1px solid #d1d5db; }
+  .metro-note { font-size:0.64rem; color:#9ca3af; margin-top:4px; line-height:1.5; }
+
+  /* Popup */
+  .leaflet-popup-content-wrapper { background:#fff; color:#1a1a1a; border:1px solid #d1d5db; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.12); }
+  .leaflet-popup-tip { background:#fff; }
+  .leaflet-popup-content { font-size:0.78rem; line-height:1.5; margin:10px 14px; }
+  .popup-hdr { font-weight:700; font-size:0.85rem; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
+  .popup-row { display:flex; justify-content:space-between; gap:12px; padding:2px 0; }
+  .popup-lbl { color:#6b7280; }
+  .popup-val { font-weight:600; }
+
+  /* Legend */
+  .legend { background:#fff; border:1px solid #d1d5db; border-radius:6px; padding:10px 12px; font-size:0.7rem; color:#374151; box-shadow:0 1px 4px rgba(0,0,0,0.08); line-height:1.7; }
+  .legend-title { font-weight:700; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.4px; color:#1a1a1a; margin-bottom:3px; }
+  .legend-swatch { display:inline-block; width:14px; height:10px; border-radius:2px; margin-right:6px; vertical-align:middle; border:1px solid rgba(0,0,0,0.1); }
+
+  /* Callout */
+  .callout {
+    display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+    background:#fafafa; border:1px solid #e5e7eb; border-left:4px solid #EA580C;
+    border-radius:0 6px 6px 0; padding:14px 20px; margin-bottom:16px;
+  }
+  .co-block { text-align:center; }
+  .co-label { font-size:0.62rem; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+  .co-val { font-size:1.5rem; font-weight:700; }
+  .co-sub { font-size:0.68rem; color:#9ca3af; }
+  .co-arrow { color:#d1d5db; font-size:1.3rem; }
+
+  /* Tables */
+  h2 { font-size:1rem; font-weight:700; color:#1a1a1a; margin:24px 0 8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
+  .table-wrap { overflow-x:auto; border:1px solid #e5e7eb; border-radius:6px; margin-bottom:20px; }
+  table.main { width:100%; border-collapse:collapse; font-size:0.73rem; }
+  table.main th {
+    background:#f8fafc; color:#374151; font-weight:700; text-align:left;
+    padding:8px 8px; white-space:nowrap; position:sticky; top:0;
+    font-size:0.62rem; text-transform:uppercase; letter-spacing:0.4px;
+    border-bottom:2px solid #e5e7eb;
+  }
+  table.main th.num { text-align:right; }
+  table.main td { padding:5px 8px; border-bottom:1px solid #f3f4f6; white-space:nowrap; }
+  table.main tr:hover td { background:#f8fafc; }
+  table.main tr.total-row td { background:#f1f5f9; font-weight:700; border-top:2px solid #374151; color:#1a1a1a; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+
+  /* Methodology */
+  .meth { background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:16px 20px; margin:20px 0; font-size:0.74rem; color:#374151; line-height:1.6; }
+  .meth h3 { font-size:0.82rem; font-weight:700; color:#1a1a1a; margin-bottom:6px; }
+  .meth ul { padding-left:16px; }
+  .meth li { margin-bottom:3px; }
+
+  /* Footnotes */
+  sup.fn { font-size:0.55rem; color:#6b7280; cursor:help; font-weight:400; vertical-align:super; margin-left:1px; }
+  .footnotes { border-top:1px solid #e5e7eb; margin-top:20px; padding-top:16px; }
+  .footnotes h3 { font-size:0.82rem; font-weight:700; color:#1a1a1a; margin-bottom:10px; }
+  .fn-item { display:flex; gap:8px; margin-bottom:8px; font-size:0.68rem; color:#374151; line-height:1.6; }
+  .fn-num { flex-shrink:0; font-weight:700; color:#6b7280; min-width:18px; }
+  .fn-text { flex:1; }
+  .fn-text code { background:#f3f4f6; padding:1px 4px; border-radius:2px; font-size:0.64rem; font-family:'SF Mono','Consolas',monospace; color:#9a3412; }
+  .fn-caveat { background:#FEF3C7; border:1px solid #FDE68A; border-radius:4px; padding:8px 12px; margin:4px 0; font-size:0.64rem; line-height:1.5; color:#92400E; }
+
+  /* Loading indicator */
+  .map-loading { position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:1000;
+    background:#fff; border:1px solid #d1d5db; border-radius:4px; padding:4px 12px;
+    font-size:0.68rem; color:#EA580C; box-shadow:0 1px 4px rgba(0,0,0,0.1); display:none; }
+
+  @media print {
+    .metro-section { page-break-before:always; }
+    .metro-map { height:400px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Verizon / Charter: Footprint Overlap &amp; Potential Divestiture Analysis <span class="badge">CONFIDENTIAL</span></h1>
+  <div class="subtitle">FCC BDC June 2025 &mdash; Verizon pro forma (incl. Frontier acquisition) vs Charter/Spectrum pro forma (incl. Cox merger) &mdash; Census block group granularity &mdash; March 2026</div>
+  <div style="font-size:0.66rem;color:#9ca3af;margin-top:4px;line-height:1.4"><strong style="color:#6b7280">BSL</strong> = Broadband Serviceable Location &mdash; a single address (home, business, or institution) where a provider has certified broadband service availability per FCC Broadband Data Collection rules. Each BSL has a unique FCC <code style="font-size:0.62rem;background:#f3f4f6;padding:0 3px;border-radius:2px">location_id</code>. A BSL is counted as <strong style="color:${OVL_ORANGE}">overlap</strong> if served by at least one Group A fiber provider AND at least one Group B cable provider.</div>
+</div>
+
+<div class="strip" id="strip"></div>
+<div class="callout" id="callout"></div>
+
+<div id="exhibit"></div>
+
+<div style="position:relative;margin-bottom:20px">
+  <div class="national-map" id="map-national"></div>
+</div>
+
+<div id="metro-maps"></div>
+
+<h2>Overlap by State &mdash; Potential Divestiture Exposure</h2>
+<div class="table-wrap" id="state-table"></div>
+
+<h2>Overlap by Provider Pair<sup class="fn" title="See footnote 12" style="font-size:0.6rem">12</sup></h2>
+<div id="pair-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:10px 0 20px"></div>
+
+<div class="meth" id="meth"></div>
+
+<div class="footnotes" id="footnotes"></div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="overlap_bg_data.js" onerror="window.BG_OVERLAP={};window.BG_BY_COUNTY={};console.warn('Block group data not loaded');"></script>
+<script>
+// ================================================================
+// COLORS
+// ================================================================
+const VZ_RED     = '#EE0000';
+const VZ_FILL    = '#EE0000';
+const VZ_LIGHT   = '#FEE2E2';
+const CHTR_BLUE  = '#0077C8';
+const CHTR_FILL  = '#0077C8';
+const CHTR_LIGHT = '#DBEAFE';
+const OVL_ORANGE = '#EA580C';
+const OVL_FILL   = '#F97316';
+const OVL_LIGHT  = '#FED7AA';
+const AMBER      = '#d97706';
+
+// ================================================================
+// DATA
+// ================================================================
+const BY_STATE = {
+  CA:{ga:1791084,gb:5669474,overlap:1621550,a_prov:{Frontier:1791084},b_prov:{'Charter':4852172,Cox:817302}},
+  NY:{ga:2302603,gb:2818610,overlap:1066208,a_prov:{Verizon:2123392,Frontier:179211},b_prov:{Charter:2818610}},
+  FL:{ga:1209100,gb:3377675,overlap:1030048,a_prov:{Frontier:1209100},b_prov:{Charter:3079402,Cox:298273}},
+  VA:{ga:1160012,gb:938878,overlap:535229,a_prov:{Verizon:1160010,Frontier:2},b_prov:{Cox:820501,Charter:118377}},
+  TX:{ga:876198,gb:4944632,overlap:520413,a_prov:{Frontier:876198},b_prov:{Charter:4944632}},
+  RI:{ga:269850,gb:325267,overlap:261340,a_prov:{Verizon:269850},b_prov:{Cox:325225,Charter:42}},
+  CT:{ga:835733,gb:264894,overlap:194617,a_prov:{Frontier:824991,Verizon:10742},b_prov:{Cox:141003,Charter:123891}},
+  OH:{ga:204431,gb:3607087,overlap:149778,a_prov:{Frontier:204431},b_prov:{Charter:3522867,Cox:84220}},
+  WI:{ga:63834,gb:1663525,overlap:59386,a_prov:{Frontier:63834},b_prov:{Charter:1663525}},
+  MI:{ga:148924,gb:1126850,overlap:51639,a_prov:{Frontier:148924},b_prov:{Charter:1126850}},
+  MA:{ga:914782,gb:292410,overlap:49468,a_prov:{Verizon:914782},b_prov:{Charter:290961,Cox:1449}},
+  NC:{ga:34026,gb:3458726,overlap:32342,a_prov:{Frontier:34026},b_prov:{Charter:3456508,Cox:2218}},
+  NJ:{ga:1487551,gb:37161,overlap:32921,a_prov:{Verizon:1487551},b_prov:{Charter:37161}},
+  TN:{ga:43533,gb:850710,overlap:22749,a_prov:{Frontier:43533},b_prov:{Charter:850710}},
+  SC:{ga:21898,gb:1340479,overlap:21640,a_prov:{Frontier:21898},b_prov:{Charter:1340479}},
+  IN:{ga:285500,gb:555617,overlap:21721,a_prov:{Frontier:285500},b_prov:{Charter:555617}},
+  WV:{ga:246578,gb:31808,overlap:20013,a_prov:{Frontier:246578},b_prov:{Charter:31808}},
+  MN:{ga:25807,gb:394896,overlap:16533,a_prov:{Frontier:25807},b_prov:{Charter:394896}},
+  PA:{ga:2003416,gb:141347,overlap:2329,a_prov:{Verizon:1871231,Frontier:132185},b_prov:{Charter:141347}},
+  IL:{ga:162005,gb:265429,overlap:3068,a_prov:{Frontier:162005},b_prov:{Charter:265429}},
+  MD:{ga:1063027,gb:4360,overlap:0,a_prov:{Verizon:1063027},b_prov:{Charter:4360}},
+  DE:{ga:219070,gb:0,overlap:0,a_prov:{Verizon:219070},b_prov:{}},
+  DC:{ga:106502,gb:21,overlap:7,a_prov:{Verizon:106502},b_prov:{Cox:21}},
+  AL:{ga:0,gb:940012,overlap:0,b_prov:{Charter:940012}},
+  AZ:{ga:521,gb:1844671,overlap:0,a_prov:{Frontier:521},b_prov:{Charter:72503,Cox:1772168}},
+  AR:{ga:0,gb:241899,overlap:0,b_prov:{Cox:241899}},
+  CO:{ga:0,gb:155606,overlap:0,b_prov:{Charter:155606}},
+  GA:{ga:38,gb:799069,overlap:0,b_prov:{Charter:679978,Cox:119091}},
+  HI:{ga:0,gb:301549,overlap:0,b_prov:{Charter:301549}},
+  ID:{ga:0,gb:74632,overlap:0,b_prov:{Cox:10220,Charter:64412}},
+  IA:{ga:105,gb:26567,overlap:0,b_prov:{Cox:26567}},
+  KS:{ga:0,gb:645966,overlap:0,b_prov:{Cox:429889,Charter:216077}},
+  KY:{ga:0,gb:1051179,overlap:0,b_prov:{Charter:1051179}},
+  LA:{ga:0,gb:992418,overlap:0,b_prov:{Cox:711456,Charter:280962}},
+  ME:{ga:0,gb:469337,overlap:0,b_prov:{Charter:469337}},
+  MS:{ga:0,gb:16658,overlap:0,b_prov:{Charter:16658}},
+  MO:{ga:0,gb:1225791,overlap:0,b_prov:{Charter:1225786,Cox:5}},
+  MT:{ga:0,gb:254800,overlap:0,b_prov:{Charter:254800}},
+  NE:{ga:21,gb:501960,overlap:0,b_prov:{Charter:255470,Cox:246490}},
+  NV:{ga:192,gb:885507,overlap:0,b_prov:{Cox:657970,Charter:227537}},
+  NH:{ga:1,gb:81676,overlap:0,b_prov:{Charter:81676}},
+  NM:{ga:0,gb:12075,overlap:0,b_prov:{Charter:12075}},
+  OK:{ga:0,gb:724597,overlap:0,b_prov:{Cox:724597}},
+  OR:{ga:0,gb:359584,overlap:0,b_prov:{Charter:359584}},
+  VT:{ga:0,gb:17438,overlap:0,b_prov:{Charter:17438}},
+  WA:{ga:0,gb:252744,overlap:0,b_prov:{Charter:252744}},
+  WY:{ga:0,gb:132574,overlap:0,b_prov:{Charter:132574}},
+};
+
+const BDC = { vz:9227028, fr:6250184, ch:36725099, cx:7430564, ga:15476342, gb:44118165, overlap:5712999 };
+const REPORTED = { vz:21000000, fr:9000000, ch:58400000, cx:12300000 };
+REPORTED.ga = REPORTED.vz + REPORTED.fr;
+REPORTED.gb = REPORTED.ch + REPORTED.cx;
+const FACTOR = { vz:REPORTED.vz/BDC.vz, fr:REPORTED.fr/BDC.fr, ch:REPORTED.ch/BDC.ch, cx:REPORTED.cx/BDC.cx };
+
+const PAIRS = {
+  'Frontier vs Charter':{total:3775442,fiber:79761,hfc:3695681},
+  'Verizon vs Charter':{total:994692,fiber:8899,hfc:985793},
+  'Verizon vs Cox':{total:794593,fiber:9924,hfc:784669},
+  'Frontier vs Cox':{total:148272,fiber:7432,hfc:140840}
+};
+
+const COUNTIES = [
+  {f:'06037',n:'Los Angeles',s:'CA',lat:34.05,lng:-118.24,o:654167,a:656091,b:2028228},
+  {f:'12057',n:'Hillsborough',s:'FL',lat:27.94,lng:-82.35,o:399042,a:403057,b:460907},
+  {f:'06065',n:'Riverside',s:'CA',lat:33.74,lng:-116.00,o:385283,a:410739,b:689768},
+  {f:'06071',n:'San Bernardino',s:'CA',lat:34.84,lng:-116.18,o:343464,a:351641,b:586027},
+  {f:'36081',n:'Queens',s:'NY',lat:40.73,lng:-73.79,o:285392,a:285478,b:309519},
+  {f:'51059',n:'Fairfax',s:'VA',lat:38.83,lng:-77.28,o:227204,a:241579,b:238365},
+  {f:'12101',n:'Pasco',s:'FL',lat:28.29,lng:-82.43,o:194098,a:196173,b:249074},
+  {f:'12103',n:'Pinellas',s:'FL',lat:27.88,lng:-82.73,o:170593,a:170608,b:339712},
+  {f:'36029',n:'Erie',s:'NY',lat:42.76,lng:-78.78,o:157057,a:157423,b:323206},
+  {f:'44007',n:'Providence',s:'RI',lat:41.87,lng:-71.58,o:156166,a:160520,b:166367},
+  {f:'12105',n:'Polk',s:'FL',lat:27.95,lng:-81.69,o:154088,a:169106,b:282220},
+  {f:'48113',n:'Dallas',s:'TX',lat:32.77,lng:-96.77,o:138884,a:139667,b:652330},
+  {f:'36067',n:'Onondaga',s:'NY',lat:43.01,lng:-76.19,o:113027,a:114720,b:158415},
+  {f:'36085',n:'Richmond (SI)',s:'NY',lat:40.58,lng:-74.15,o:112046,a:112080,b:116646},
+  {f:'12081',n:'Manatee',s:'FL',lat:27.47,lng:-82.39,o:111990,a:115862,b:164326},
+  {f:'48121',n:'Denton',s:'TX',lat:33.21,lng:-97.11,o:110043,a:129125,b:202219},
+  {f:'48085',n:'Collin',s:'TX',lat:33.18,lng:-96.57,o:108625,a:112267,b:285682},
+  {f:'36055',n:'Monroe',s:'NY',lat:43.17,lng:-77.62,o:97856,a:98239,b:246723},
+  {f:'51810',n:'Virginia Beach',s:'VA',lat:36.85,lng:-76.00,o:94996,a:95718,b:134280},
+  {f:'06059',n:'Orange',s:'CA',lat:33.72,lng:-117.78,o:91074,a:91168,b:711975},
+  {f:'06111',n:'Ventura',s:'CA',lat:34.36,lng:-119.13,o:87813,a:89164,b:222712},
+  {f:'09003',n:'Hartford',s:'CT',lat:41.77,lng:-72.68,o:79372,a:192281,b:108959},
+  {f:'48439',n:'Tarrant',s:'TX',lat:32.77,lng:-97.29,o:66573,a:76192,b:617345},
+  {f:'51550',n:'Chesapeake',s:'VA',lat:36.77,lng:-76.24,o:57807,a:59035,b:77304},
+  {f:'44003',n:'Kent',s:'RI',lat:41.68,lng:-71.57,o:55668,a:56945,b:58260},
+  {f:'36047',n:'Brooklyn',s:'NY',lat:40.63,lng:-73.94,o:50438,a:214195,b:70038},
+  {f:'36001',n:'Albany',s:'NY',lat:42.60,lng:-73.97,o:49649,a:49931,b:92956},
+  {f:'44009',n:'Washington',s:'RI',lat:41.40,lng:-71.62,o:47842,a:50703,b:51904},
+  {f:'25027',n:'Worcester',s:'MA',lat:42.35,lng:-71.93,o:44281,a:80816,b:163102},
+  {f:'51700',n:'Newport News',s:'VA',lat:37.09,lng:-76.47,o:44256,a:44980,b:48335},
+  {f:'36071',n:'Orange',s:'NY',lat:41.40,lng:-74.31,o:38126,a:45515,b:77885},
+  {f:'36093',n:'Schenectady',s:'NY',lat:42.80,lng:-74.07,o:34960,a:35379,b:52183},
+  {f:'37063',n:'Durham',s:'NC',lat:36.04,lng:-78.88,o:31674,a:33149,b:99779},
+  {f:'09001',n:'Fairfield',s:'CT',lat:41.18,lng:-73.25,o:31517,a:209018,b:42370},
+  {f:'34003',n:'Bergen',s:'NJ',lat:40.96,lng:-74.07,o:30823,a:213692,b:34790},
+  {f:'51650',n:'Hampton',s:'VA',lat:37.03,lng:-76.35,o:30073,a:30561,b:44516},
+  {f:'06083',n:'Santa Barbara',s:'CA',lat:34.69,lng:-120.07,o:27806,a:57636,b:52278},
+  {f:'51740',n:'Portsmouth',s:'VA',lat:36.84,lng:-76.30,o:23525,a:23803,b:32473},
+  {f:'09005',n:'Litchfield',s:'CT',lat:41.79,lng:-73.23,o:22967,a:54929,b:32287},
+  {f:'09009',n:'New Haven',s:'CT',lat:41.35,lng:-72.90,o:21686,a:189274,b:31878},
+  {f:'18167',n:'Vigo',s:'IN',lat:39.47,lng:-87.39,o:20168,a:20196,b:36018},
+  {f:'09015',n:'Windham',s:'CT',lat:41.74,lng:-72.02,o:19940,a:33875,b:24940},
+  {f:'51199',n:'York',s:'VA',lat:37.23,lng:-76.51,o:17678,a:18138,b:23389},
+  {f:'39101',n:'Marion',s:'OH',lat:40.58,lng:-83.16,o:16616,a:17084,b:22253},
+  {f:'27037',n:'Dakota',s:'MN',lat:44.67,lng:-93.07,o:16457,a:19349,b:57798},
+  {f:'09013',n:'Tolland',s:'CT',lat:41.85,lng:-72.35,o:16329,a:35970,b:21280},
+  {f:'39157',n:'Tuscarawas',s:'OH',lat:40.45,lng:-81.47,o:15084,a:16072,b:34456},
+  {f:'55073',n:'Marathon',s:'WI',lat:44.90,lng:-89.76,o:13689,a:13727,b:42784},
+  {f:'06085',n:'Santa Clara',s:'CA',lat:37.35,lng:-121.96,o:13595,a:24406,b:30609},
+  {f:'36027',n:'Dutchess',s:'NY',lat:41.76,lng:-73.74,o:13475,a:41130,b:24243},
+];
+
+const ST_ABBR = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA','Colorado':'CO',
+  'Connecticut':'CT','Delaware':'DE','District of Columbia':'DC','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS',
+  'Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA',
+  'Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT',
+  'Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM',
+  'New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',
+  'Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT','Virginia':'VA','Washington':'WA',
+  'West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY'
+};
+
+// ================================================================
+// METRO MARKET DEFINITIONS
+// ================================================================
+const METROS = [
+  {
+    id:'nyc', title:'New York / Tri-State',
+    center:[40.75,-73.95], zoom:9,
+    countyFips:['36081','36085','36047','36071','34003','36027','36029','36067','36055','36001','36093','25027'],
+    note:'NYC boroughs (Queens, Brooklyn, Staten Island), Northern NJ (Bergen), Hudson Valley, Upstate NY. Verizon Fios is dominant fiber; Charter/Spectrum is the primary cable operator across the region.',
+  },
+  {
+    id:'socal', title:'Southern California',
+    center:[34.00,-117.50], zoom:8,
+    countyFips:['06037','06065','06071','06059','06111','06083','06085'],
+    note:'LA Basin, Inland Empire, Orange County, Ventura, Santa Barbara. Frontier (now Verizon) fiber overlaps extensively with Charter/Spectrum HFC. Largest single overlap market nationally.',
+  },
+  {
+    id:'tampa', title:'Tampa Bay / Central Florida',
+    center:[27.90,-82.30], zoom:9,
+    countyFips:['12057','12101','12103','12105','12081'],
+    note:'Hillsborough, Pasco, Pinellas, Polk, Manatee counties. Frontier (now Verizon) built aggressively; Charter/Spectrum has deep HFC penetration. Near-total overlap in several counties.',
+  },
+  {
+    id:'dfw', title:'Dallas&ndash;Fort Worth',
+    center:[32.85,-96.85], zoom:9,
+    countyFips:['48113','48121','48085','48439'],
+    note:'Dallas, Denton, Collin, Tarrant counties. Frontier (now Verizon) FTTP vs Charter/Spectrum cable. ~424K overlap BSLs across the metro.',
+  },
+  {
+    id:'hampton', title:'Virginia / Hampton Roads',
+    center:[37.10,-76.40], zoom:9,
+    countyFips:['51059','51810','51550','51650','51740','51700','51199'],
+    note:'Fairfax (NoVA), Virginia Beach, Chesapeake, Hampton, Portsmouth, Newport News, York. Verizon Fios vs Cox (primary cable) with some Charter. Dense overlap in suburban corridors.',
+  },
+  {
+    id:'ctri', title:'Connecticut / Rhode Island',
+    center:[41.55,-72.10], zoom:9,
+    countyFips:['09003','09001','09005','09009','09015','09013','44007','44003','44009'],
+    note:'Frontier (now Verizon) fiber covers most of CT; Charter + Cox split cable. RI: Verizon Fios vs Cox. Combined ~454K overlap BSLs. High regulatory sensitivity given near-total footprint overlap.',
+  },
+];
+
+// ================================================================
+// HELPERS
+// ================================================================
+function fmt(n) { return n.toLocaleString('en-US'); }
+function fmtM(n) { return (n/1e6).toFixed(1)+'M'; }
+function fmtK(n) { return n >= 1000 ? (n/1e3).toFixed(0)+'K' : fmt(n); }
+
+function stAdj(st) {
+  const d = BY_STATE[st]; if (!d) return null;
+  const vz=(d.a_prov&&d.a_prov.Verizon)||0, fr=(d.a_prov&&d.a_prov.Frontier)||0;
+  const ch=(d.b_prov&&d.b_prov.Charter)||0, cx=(d.b_prov&&d.b_prov.Cox)||0;
+  const unrep_a = Math.round(vz*(FACTOR.vz-1) + fr*(FACTOR.fr-1));
+  const unrep_b = Math.round(ch*(FACTOR.ch-1) + cx*(FACTOR.cx-1));
+  const totA = vz+fr;
+  const fa = totA > 0 ? (vz*FACTOR.vz + fr*FACTOR.fr)/totA : 1;
+  return { unrep_a, unrep_b, lo:d.overlap, hi:Math.round(d.overlap*fa) };
+}
+
+let natUnA=0,natUnB=0,natHi=0;
+for (const st of Object.keys(BY_STATE)) { const a=stAdj(st); if(a){natUnA+=a.unrep_a;natUnB+=a.unrep_b;natHi+=a.hi;} }
+
+function metroOverlap(fipsList) {
+  let total = 0;
+  fipsList.forEach(f => { const c = COUNTIES.find(x=>x.f===f); if(c) total += c.o; });
+  return total;
+}
+
+// ================================================================
+// RENDER UI
+// ================================================================
+function renderStrip() {
+  document.getElementById('strip').innerHTML = `
+    <div class="strip-item"><div class="strip-label">Verizon PF Fiber<sup class="fn" title="See footnote 1">1</sup></div><div class="strip-val" style="color:${VZ_RED}">${fmtM(REPORTED.ga)}</div><div class="strip-sub">~30M passings (incl. Frontier)</div></div>
+    <div class="strip-item"><div class="strip-label">Charter PF Cable<sup class="fn" title="See footnote 2">2</sup></div><div class="strip-val" style="color:${CHTR_BLUE}">${fmtM(REPORTED.gb)}</div><div class="strip-sub">~70.7M passings (incl. Cox)</div></div>
+    <div class="strip-item"><div class="strip-label">BDC Confirmed Overlap<sup class="fn" title="See footnote 3">3</sup></div><div class="strip-val" style="color:${OVL_ORANGE}">${fmtM(BDC.overlap)}</div><div class="strip-sub">${(BDC.overlap/BDC.ga*100).toFixed(1)}% of VZ fiber footprint<sup class="fn" title="See footnote 11">11</sup></div></div>
+    <div class="strip-item"><div class="strip-label">Potential Divestiture BSLs<sup class="fn" title="See footnote 4">4</sup></div><div class="strip-val" style="color:${OVL_ORANGE}">${fmtM(BDC.overlap)} &ndash; ${fmtM(natHi)}</div><div class="strip-sub">Adj. for BDC undercount<sup class="fn" title="See footnote 8">8</sup></div></div>
+    <div class="strip-item"><div class="strip-label">~Households at Risk<sup class="fn" title="See footnote 5">5</sup></div><div class="strip-val" style="color:#374151">${fmtM(Math.round(BDC.overlap*0.93))}</div><div class="strip-sub">~93% residential mix</div></div>
+  `;
+}
+
+function renderCallout() {
+  document.getElementById('callout').innerHTML = `
+    <div class="co-block"><div class="co-label">Overlap Floor (BDC)<sup class="fn" title="See footnote 3">3</sup></div><div class="co-val" style="color:#6b7280">${fmtM(BDC.overlap)}</div><div class="co-sub">Confirmed BSL-level</div></div>
+    <div class="co-arrow">&rarr;</div>
+    <div class="co-block"><div class="co-label">Adj. Overlap Range<sup class="fn" title="See footnote 10">10</sup></div><div class="co-val" style="color:${OVL_ORANGE}">${fmtM(BDC.overlap)} &ndash; ${fmtM(natHi)}</div><div class="co-sub">BDC undercount adj. (ceiling)<sup class="fn" title="See footnote 10">10</sup></div></div>
+    <div class="co-arrow">&rarr;</div>
+    <div class="co-block"><div class="co-label">% of VZ Footprint<sup class="fn" title="See footnote 11">11</sup></div><div class="co-val" style="color:#1a1a1a">~37%</div><div class="co-sub">Exposed to divestiture</div></div>
+    <div class="co-arrow">&rarr;</div>
+    <div class="co-block"><div class="co-label">Est. Households<sup class="fn" title="See footnote 5">5</sup></div><div class="co-val" style="color:#059669">${fmtM(Math.round(BDC.overlap*0.93))} &ndash; ${fmtM(Math.round(natHi*0.93))}</div><div class="co-sub">~93% residential mix</div></div>
+  `;
+}
+
+function renderExhibit() {
+  const rows = [
+    {name:'Verizon (Fios)',bdc:BDC.vz,rep:REPORTED.vz,color:VZ_RED,note:'~21M standalone (30M PF - 9M FR)'},
+    {name:'Frontier',bdc:BDC.fr,rep:REPORTED.fr,color:VZ_RED,note:'8.8M Q3 \'25; ~9M Q4 pre-close'},
+    {name:'Group A (PF)',bdc:BDC.ga,rep:REPORTED.ga,color:VZ_RED,isSub:true,note:'~30M per VZ'},
+    {name:'Charter/Spectrum',bdc:BDC.ch,rep:REPORTED.ch,color:CHTR_BLUE,note:'58.4M Q4 \'25'},
+    {name:'Cox',bdc:BDC.cx,rep:REPORTED.cx,color:CHTR_BLUE,note:'12.3M (merger filing)'},
+    {name:'Group B (PF)',bdc:BDC.gb,rep:REPORTED.gb,color:CHTR_BLUE,isSub:true,note:'~70.7M'},
+  ];
+  const maxGap = Math.max(...rows.map(r=>r.rep-r.bdc));
+  let html = `<div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;padding:16px 20px;margin-bottom:16px">
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#374151;margin-bottom:10px">BDC vs Operator-Reported Passings &mdash; Potential Undercounting</div>
+    <table class="main"><thead><tr><th>Operator</th><th class="num">BDC BSLs<sup class="fn" title="See footnote 6">6</sup></th><th class="num">Reported Passings<sup class="fn" title="See footnote 7">7</sup></th><th class="num">Gap<sup class="fn" title="See footnote 8">8</sup></th><th class="num">Factor<sup class="fn" title="See footnote 8">8</sup></th></tr></thead><tbody>`;
+  for (const r of rows) {
+    const gap = r.rep - r.bdc;
+    const factor = (r.rep/r.bdc).toFixed(2);
+    const barW = Math.max(2, gap/maxGap*70);
+    const cls = r.isSub ? ' style="border-top:2px solid #d1d5db;font-weight:700"' : '';
+    html += `<tr${cls}><td style="color:${r.color};${r.isSub?'font-weight:700':''}">${r.name}</td><td class="num">${fmtM(r.bdc)}</td><td class="num">${fmtM(r.rep)}</td><td class="num" style="color:${AMBER}">${fmtM(gap)} <span style="display:inline-block;height:7px;border-radius:1px;vertical-align:middle;margin-left:3px;background:${AMBER};width:${barW}px"></span></td><td class="num" style="color:${OVL_ORANGE};font-weight:600">${factor}x</td></tr>`;
+    if (r.name.startsWith('Group A')) html += '<tr><td colspan="5" style="height:4px;border:none"></td></tr>';
+  }
+  html += `</tbody></table>
+    <div style="font-size:0.64rem;color:#9ca3af;margin-top:10px;line-height:1.5"><strong>Gap driver:</strong> BDC = certified serviceable locations (FTTP only for Group A). Operator "passings" = franchise territory where plant is nearby. Verizon gap largest (~${FACTOR.vz.toFixed(1)}x) as Fios passings include copper-adjacent locations not yet certified FTTP in the BDC.</div>
+    <div style="margin-top:8px;font-size:0.6rem;color:#9ca3af;line-height:1.6">
+      <strong style="color:#374151">Sources:</strong>
+      <span style="color:${VZ_RED}">&#9679;</span> VZ Q4 2025 Earnings (Jan 30, 2026) &mdash; "over 30M fiber passings pro forma" &nbsp;
+      <span style="color:${VZ_RED}">&#9679;</span> FR Q3 2025 Earnings (Nov 2025) &mdash; 8.8M FTTP passings &nbsp;
+      <span style="color:${CHTR_BLUE}">&#9679;</span> CHTR Q4 2025 Earnings (Jan 31, 2026) &mdash; 58.4M total est. passings &nbsp;
+      <span style="color:${CHTR_BLUE}">&#9679;</span> Charter-Cox Merger Announcement (May 2025) &mdash; ~12.3M Cox passings &nbsp;
+      <span style="color:#6b7280">&#9679;</span> FCC BDC Jun 2025 filing (J25) &mdash; 140 CSVs, 100M+ BSL records
+    </div>
+  </div>`;
+  document.getElementById('exhibit').innerHTML = html;
+}
+
+function renderPairs() {
+  let html = '';
+  for (const [name,d] of Object.entries(PAIRS)) {
+    html += `<div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;padding:12px 14px"><div style="font-size:0.72rem;color:#6b7280;font-weight:500">${name}</div><div style="font-size:1.15rem;font-weight:700;color:${OVL_ORANGE}">${fmt(d.total)}</div><div style="font-size:0.66rem;color:#9ca3af;margin-top:2px">vs Fiber: ${fmt(d.fiber)} | vs HFC: ${fmt(d.hfc)} | ${(d.total/BDC.overlap*100).toFixed(0)}% of total</div></div>`;
+  }
+  document.getElementById('pair-grid').innerHTML = html;
+}
+
+function renderStateTable() {
+  const states = Object.entries(BY_STATE).filter(([,d])=>d.ga>500||d.overlap>0).sort((a,b)=>b[1].overlap-a[1].overlap);
+  let rows='', totGA=0,totGB=0,totOvl=0,totUnA=0,totUnB=0,totHi=0;
+  for (const [st,d] of states) {
+    const a = stAdj(st);
+    const rate = d.ga>0?(d.overlap/d.ga*100).toFixed(1):'--';
+    const aProv = Object.keys(d.a_prov||{}).map(k=>k==='Frontier'?'FR':k==='Verizon'?'VZ':k).join('+');
+    const bProv = Object.keys(d.b_prov||{}).map(k=>k==='Charter'?'CHTR':k).join('+');
+    totGA+=d.ga;totGB+=d.gb;totOvl+=d.overlap;totUnA+=a.unrep_a;totUnB+=a.unrep_b;totHi+=a.hi;
+    rows += `<tr>
+      <td><strong>${st}</strong></td>
+      <td style="font-size:0.66rem;color:#9ca3af">${aProv}</td>
+      <td class="num" style="color:${VZ_RED}">${fmt(d.ga)}</td>
+      <td class="num" style="color:${AMBER}">${a.unrep_a>0?'+'+fmt(a.unrep_a):'--'}</td>
+      <td style="font-size:0.66rem;color:#9ca3af">${bProv}</td>
+      <td class="num" style="color:${CHTR_BLUE}">${fmt(d.gb)}</td>
+      <td class="num" style="color:${AMBER}">${a.unrep_b>0?'+'+fmt(a.unrep_b):'--'}</td>
+      <td class="num" style="color:${OVL_ORANGE};font-weight:600">${d.overlap>0?fmt(d.overlap):'--'}</td>
+      <td class="num">${d.overlap>0&&a.lo!==a.hi?`<span style="color:#6b7280">${fmt(a.lo)}</span><span style="color:#9ca3af"> &ndash; </span><span style="color:${OVL_ORANGE};font-weight:700">${fmt(a.hi)}</span>`:(d.overlap>0?fmt(d.overlap):'--')}</td>
+      <td class="num">${d.overlap>0?rate+'%':'--'}</td>
+      <td class="num">${d.overlap>0?fmt(Math.round(d.overlap*0.93)):'--'}</td>
+    </tr>`;
+  }
+  rows += `<tr class="total-row"><td>TOTAL</td><td></td><td class="num">${fmt(totGA)}</td><td class="num" style="color:${AMBER}">+${fmt(totUnA)}</td><td></td><td class="num">${fmt(totGB)}</td><td class="num" style="color:${AMBER}">+${fmt(totUnB)}</td><td class="num">${fmt(totOvl)}</td><td class="num"><span style="color:#6b7280">${fmt(totOvl)}</span><span style="color:#9ca3af"> &ndash; </span><span style="color:${OVL_ORANGE};font-weight:700">${fmt(totHi)}</span></td><td class="num">${(totOvl/totGA*100).toFixed(1)}%</td><td class="num">${fmt(Math.round(totOvl*0.93))}</td></tr>`;
+  document.getElementById('state-table').innerHTML = `<table class="main"><thead><tr>
+    <th>State</th><th style="width:40px">A<sup class="fn" title="See footnote 1">1</sup></th><th class="num">VZ+FR BSLs<sup class="fn" title="See footnote 6">6</sup></th><th class="num" style="color:${AMBER}">Unreported<sup class="fn" title="See footnote 9">9</sup></th>
+    <th style="width:50px">B<sup class="fn" title="See footnote 2">2</sup></th><th class="num">CHTR+COX BSLs<sup class="fn" title="See footnote 6">6</sup></th><th class="num" style="color:${AMBER}">Unreported<sup class="fn" title="See footnote 9">9</sup></th>
+    <th class="num" style="color:${OVL_ORANGE}">BDC Overlap<sup class="fn" title="See footnote 3">3</sup></th><th class="num">Est. Range<sup class="fn" title="See footnote 10">10</sup></th><th class="num">Overlap %<sup class="fn" title="See footnote 11">11</sup></th><th class="num">~Households<sup class="fn" title="See footnote 5">5</sup></th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderMeth() {
+  document.getElementById('meth').innerHTML = `
+    <h3>Methodology &amp; Assumptions</h3>
+    <ul>
+      <li><strong>Source:</strong> FCC BDC June 2025 filing (J25). 140 CSVs, 8.2 GB, 100M+ records across Verizon, Frontier, Charter, Cox in all states</li>
+      <li><strong>Group A (Fiber):</strong> Verizon + Frontier FTTP (tech code 50) only. Excludes VZ 5G Home / FWA (tech 71). Pro forma total ~30M per Verizon Q4 2025 earnings</li>
+      <li><strong>Group B (Cable):</strong> Charter + Cox full broadband: FTTP (50) + Cable/DOCSIS (40-43). Pro forma total ~70.7M per Charter Q4 2025 earnings + Cox merger filing</li>
+      <li><strong>Overlap:</strong> BSL-level match on FCC <code>location_id</code>. A location counts as overlap if served by at least one Group A provider AND at least one Group B provider</li>
+      <li><strong>BDC Undercount:</strong> BDC captures certified serviceable locations, which systematically undercounts vs operator-reported passings (franchise territory where plant is nearby). Scaling factors: VZ ${FACTOR.vz.toFixed(2)}x, Frontier ${FACTOR.fr.toFixed(2)}x, Charter ${FACTOR.ch.toFixed(2)}x, Cox ${FACTOR.cx.toFixed(2)}x</li>
+      <li><strong>Unreported:</strong> Per-state estimate of BSLs likely served but not in BDC. See footnote 9 for formula</li>
+      <li><strong>Est. Range:</strong> Low = BDC confirmed overlap. High = theoretical ceiling assuming unreported locations overlap at the same rate as BDC-confirmed locations. See footnote 10 for formula and caveats</li>
+      <li><strong>Frontier passings note:</strong> Uses ~9M (VZ management estimate at close, Dec 2025) vs last reported 8.8M (Q3 2025 earnings). This forward projection increases the Frontier scaling factor by ~3% vs using the reported figure. Frontier grew from 7.2M (Q3 2024) to 8.8M (Q3 2025) = ~1.6M/yr; BDC J25 captured 6.25M (snapshot lag + certification gap)</li>
+      <li><strong>Census block groups:</strong> Boundaries from Census TIGERweb. 20,437 block groups with confirmed overlap across 281 counties</li>
+      <li><strong>Divestiture context:</strong> In a hypothetical VZ/CHTR consolidation, overlapping footprints would face FCC/DOJ scrutiny. Geographic markets with &gt;30% overlap have historically required remedies</li>
+      <li><strong>Deduplication:</strong> BDC.ga (${fmt(BDC.ga)}) &lt; VZ+FR sum (${fmt(BDC.vz+BDC.fr)}) by ~870 locations served by both VZ and FR. Similarly BDC.gb (${fmt(BDC.gb)}) &lt; CHTR+COX sum (${fmt(BDC.ch+BDC.cx)}) by ~37,500 locations served by both Charter and Cox. Totals are correctly deduplicated</li>
+    </ul>
+  `;
+}
+
+function renderFootnotes() {
+  document.getElementById('footnotes').innerHTML = `
+    <h3>Definitions &amp; Footnotes</h3>
+
+    <div class="fn-item"><div class="fn-num">[1]</div><div class="fn-text"><strong>Verizon Pro Forma / Group A.</strong> Verizon + Frontier fiber (FTTP, BDC tech code 50). Reported passings: ~30M per VZ Q4 2025 earnings call (Jan 30, 2026) &mdash; "over 30 million fiber passings pro forma." VZ standalone implied ~21M = 30M &minus; ~9M Frontier. Frontier acquisition closed Dec 2, 2025. BDC captured ${fmtM(BDC.ga)} BSLs vs ${fmtM(REPORTED.ga)} reported (${FACTOR.vz.toFixed(2)}x VZ gap, ${FACTOR.fr.toFixed(2)}x FR gap).</div></div>
+
+    <div class="fn-item"><div class="fn-num">[2]</div><div class="fn-text"><strong>Charter Pro Forma / Group B.</strong> Charter/Spectrum + Cox broadband (FTTP tech 50 + Cable/DOCSIS tech 40-43). Reported passings: Charter 58.4M per CHTR Q4 2025 earnings (Jan 31, 2026); Cox ~12.3M per Charter-Cox merger announcement (May 2025). BDC captured ${fmtM(BDC.gb)} BSLs vs ${fmtM(REPORTED.gb)} reported (${FACTOR.ch.toFixed(2)}x CHTR gap, ${FACTOR.cx.toFixed(2)}x Cox gap).</div></div>
+
+    <div class="fn-item"><div class="fn-num">[3]</div><div class="fn-text"><strong>BDC Confirmed Overlap.</strong> Count of unique FCC <code>location_id</code> values served by at least one Group A provider (FTTP) AND at least one Group B provider (FTTP + HFC/DOCSIS). Source: FCC BDC June 2025 filing, 140 state-level CSVs, 100M+ total BSL records. This is a confirmed floor &mdash; actual overlap is likely higher due to BDC undercounting (see footnote 8).</div></div>
+
+    <div class="fn-item"><div class="fn-num">[4]</div><div class="fn-text"><strong>Potential Divestiture BSLs (range).</strong> Low = BDC confirmed overlap (${fmt(BDC.overlap)}). High = national sum of per-state adjusted overlap (${fmt(natHi)}), computed as: &Sigma;<sub>states</sub>(BDC_overlap<sub>st</sub> &times; State_Factor_A<sub>st</sub>). See footnote 10 for the State Factor A formula and key caveats. The high estimate represents a theoretical ceiling, not an expected value.</div></div>
+
+    <div class="fn-item"><div class="fn-num">[5]</div><div class="fn-text"><strong>~Households.</strong> Estimated residential locations = BSL count &times; 0.93. The 93% residential ratio is a national average derived from the FCC BDC <code>business_residential_code</code> field. This ratio is applied uniformly; actual residential share varies by geography (lower in urban CBDs, higher in suburban/rural areas).</div></div>
+
+    <div class="fn-item"><div class="fn-num">[6]</div><div class="fn-text"><strong>BDC BSLs.</strong> Broadband Serviceable Locations from the FCC Broadband Data Collection, June 2025 filing (J25). For Group A: only FTTP technology (tech code 50). For Group B: FTTP (50) + Cable/DOCSIS (40, 41, 42, 43). BDC counts only locations where the provider has certified service availability &mdash; a stricter standard than operator-reported "passings."</div></div>
+
+    <div class="fn-item"><div class="fn-num">[7]</div><div class="fn-text"><strong>Reported Passings.</strong> Operator-cited passings from earnings releases and regulatory filings. "Passings" typically includes franchise territory where outside plant is deployed nearby, even if the location is not yet certified in the BDC. Key assumption: Frontier uses ~9M (VZ management forward estimate at close, Dec 2025) vs last reported 8.8M (FR Q3 2025 earnings, Nov 2025). Using 8.8M instead would reduce FACTOR.fr from ${FACTOR.fr.toFixed(4)} to ${(8800000/BDC.fr).toFixed(4)} (~3% impact on Frontier-dominated state adjustments in CA, FL, TX).</div></div>
+
+    <div class="fn-item"><div class="fn-num">[8]</div><div class="fn-text"><strong>Gap &amp; Factor.</strong> Gap = Reported Passings &minus; BDC BSLs. Factor = Reported / BDC. Per operator: VZ ${FACTOR.vz.toFixed(2)}x (BDC captures only ${(100/FACTOR.vz).toFixed(0)}% of reported), FR ${FACTOR.fr.toFixed(2)}x (${(100/FACTOR.fr).toFixed(0)}%), CHTR ${FACTOR.ch.toFixed(2)}x (${(100/FACTOR.ch).toFixed(0)}%), Cox ${FACTOR.cx.toFixed(2)}x (${(100/FACTOR.cx).toFixed(0)}%). VZ gap is largest because Fios "passings" include copper-adjacent locations in VZ franchise territory not yet certified as FTTP in the BDC.</div></div>
+
+    <div class="fn-item"><div class="fn-num">[9]</div><div class="fn-text"><strong>Unreported (per state).</strong> Estimated BSLs likely served but not captured in BDC. Calculated separately for each group using provider-specific factors weighted by that state's provider mix:<br>
+    <code>Unreported_A = VZ_bdc<sub>st</sub> &times; (${FACTOR.vz.toFixed(2)} &minus; 1) + FR_bdc<sub>st</sub> &times; (${FACTOR.fr.toFixed(2)} &minus; 1)</code><br>
+    <code>Unreported_B = CHTR_bdc<sub>st</sub> &times; (${FACTOR.ch.toFixed(2)} &minus; 1) + Cox_bdc<sub>st</sub> &times; (${FACTOR.cx.toFixed(2)} &minus; 1)</code><br>
+    National totals: Group A unreported = +${fmt(natUnA)}, Group B unreported = +${fmt(natUnB)}. Note: Group B unreported is computed and displayed but is <em>not</em> used in the overlap Est. Range calculation (see footnote 10).</div></div>
+
+    <div class="fn-item"><div class="fn-num">[10]</div><div class="fn-text"><strong>Est. Range (per state).</strong> Low = BDC confirmed overlap (floor). High = BDC overlap &times; state-weighted Group A adjustment factor (theoretical ceiling):<br>
+    <code>State_Factor_A = (VZ_bdc<sub>st</sub> &times; ${FACTOR.vz.toFixed(2)} + FR_bdc<sub>st</sub> &times; ${FACTOR.fr.toFixed(2)}) / (VZ_bdc<sub>st</sub> + FR_bdc<sub>st</sub>)</code><br>
+    <code>Est_High = BDC_Overlap<sub>st</sub> &times; State_Factor_A</code><br>
+    <div class="fn-caveat"><strong>Key caveats:</strong> (a) This assumes locations not in BDC overlap at the same rate as BDC-confirmed locations. In practice, unreported locations tend to be newer builds or less-dense franchise territory, likely with <em>lower</em> overlap rates &mdash; making the high estimate a ceiling, not an expected value. (b) Only Group A's scaling factor is applied; Group B's undercounting (CHTR ${FACTOR.ch.toFixed(2)}x, Cox ${FACTOR.cx.toFixed(2)}x) is not factored into the overlap estimate, which may understate the ceiling in the other direction. (c) In VZ-dominated states (e.g., VA), the factor is ~${FACTOR.vz.toFixed(1)}x, producing a ${((FACTOR.vz-1)*100).toFixed(0)}% uplift. In FR-dominated states (CA, FL, TX), the factor is ~${FACTOR.fr.toFixed(1)}x, producing a ${((FACTOR.fr-1)*100).toFixed(0)}% uplift. State-level results should be interpreted with these sensitivities in mind.</div></div></div>
+
+    <div class="fn-item"><div class="fn-num">[11]</div><div class="fn-text"><strong>Overlap %.</strong> BDC confirmed overlap / Group A fiber BSLs (BDC) in that state. Formula: <code>Overlap_% = BDC_Overlap<sub>st</sub> / VZ_FR_BSLs<sub>st</sub> &times; 100</code>. National: ${fmt(BDC.overlap)} / ${fmt(BDC.ga)} = ${(BDC.overlap/BDC.ga*100).toFixed(1)}%. Represents the share of the VZ/FR BDC-confirmed fiber footprint that overlaps with Charter/Cox broadband. Not adjusted for undercounting.</div></div>
+
+    <div class="fn-item"><div class="fn-num">[12]</div><div class="fn-text"><strong>Overlap by Provider Pair.</strong> Breaks total overlap by which specific Group A and Group B operator serves each overlapping <code>location_id</code>. "vs Fiber" = Group B operator serves via FTTP (tech 50). "vs HFC" = Group B serves via Cable/DOCSIS (tech 40-43). Sum of all four pairs = total BDC overlap (${fmt(BDC.overlap)}). ~98% of overlap is vs HFC/cable, with only ~2% fiber-vs-fiber.</div></div>
+  `;
+}
+
+// ================================================================
+// BASEMAP + LEGEND HELPERS
+// ================================================================
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const TILE_OPTS = { attribution:'&copy; OSM &copy; CARTO', subdomains:'abcd', maxZoom:19 };
+
+function addLegend(map) {
+  const legend = L.control({position:'bottomleft'});
+  legend.onAdd = function() {
+    const div = L.DomUtil.create('div','legend');
+    div.innerHTML = `
+      <div class="legend-title">Footprint Legend</div>
+      <div><span class="legend-swatch" style="background:${VZ_RED};opacity:0.6"></span>Verizon (incl. Frontier)</div>
+      <div><span class="legend-swatch" style="background:${CHTR_BLUE};opacity:0.5"></span>Charter (incl. Cox)</div>
+      <div><span class="legend-swatch" style="background:${OVL_ORANGE};opacity:0.7"></span>Overlap &mdash; divestiture risk</div>
+    `;
+    return div;
+  };
+  legend.addTo(map);
+}
+
+// ================================================================
+// NATIONAL MAP
+// ================================================================
+let stateGeoCache = null;
+
+function initNationalMap() {
+  const map = L.map('map-national', {zoomControl:true, preferCanvas:true}).setView([38.5,-96],4);
+  L.tileLayer(TILE_URL, TILE_OPTS).addTo(map);
+
+  fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
+    .then(r => r.json())
+    .then(geo => {
+      stateGeoCache = geo;
+      buildNationalLayers(map, geo);
+    });
+
+  addLegend(map);
+}
+
+function buildNationalLayers(map, geo) {
+  // VZ footprint (red fill) — strong opacity for clear visibility
+  L.geoJSON(geo, {
+    style: function(feature) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.ga <= 0) return {fillOpacity:0, weight:0.3, opacity:0.15, color:'#d1d5db'};
+      return { color:VZ_RED, fillColor:VZ_RED, fillOpacity:0.30, weight:1.5, opacity:0.5 };
+    },
+    onEachFeature: function(feature, layer) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.ga <= 0) return;
+      layer.bindPopup(`<div class="popup-hdr" style="color:${VZ_RED}">${feature.properties.name} &mdash; Verizon PF</div>
+        <div class="popup-row"><span class="popup-lbl">Fiber BSLs (BDC):</span><span class="popup-val" style="color:${VZ_RED}">${fmt(d.ga)}</span></div>
+      `);
+    }
+  }).addTo(map);
+
+  // Charter footprint (blue fill) — strong opacity for clear visibility
+  L.geoJSON(geo, {
+    style: function(feature) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.gb <= 0) return {fillOpacity:0, weight:0, opacity:0};
+      return { color:CHTR_BLUE, fillColor:CHTR_BLUE, fillOpacity:0.25, weight:1.5, opacity:0.4 };
+    },
+    onEachFeature: function(feature, layer) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.gb <= 0) return;
+      layer.bindPopup(`<div class="popup-hdr" style="color:${CHTR_BLUE}">${feature.properties.name} &mdash; Charter PF</div>
+        <div class="popup-row"><span class="popup-lbl">Cable BSLs (BDC):</span><span class="popup-val" style="color:${CHTR_BLUE}">${fmt(d.gb)}</span></div>
+      `);
+    }
+  }).addTo(map);
+
+  // Overlap states highlighted — highest opacity layer on top
+  L.geoJSON(geo, {
+    style: function(feature) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.overlap <= 0) return {fillOpacity:0, weight:0, opacity:0};
+      const maxOvl = 1621550; // CA
+      const intensity = Math.min(0.50, 0.12 + (d.overlap / maxOvl) * 0.38);
+      return { color:OVL_ORANGE, fillColor:OVL_FILL, fillOpacity:intensity, weight:2, opacity:0.7 };
+    },
+    onEachFeature: function(feature, layer) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.overlap <= 0) return;
+      const rate = d.ga>0?(d.overlap/d.ga*100).toFixed(1):'0';
+      layer.bindPopup(`<div class="popup-hdr" style="color:${OVL_ORANGE}">${feature.properties.name} &mdash; Overlap</div>
+        <div class="popup-row"><span class="popup-lbl">Overlap BSLs:</span><span class="popup-val" style="color:${OVL_ORANGE}">${fmt(d.overlap)}</span></div>
+        <div class="popup-row"><span class="popup-lbl">VZ Fiber:</span><span class="popup-val" style="color:${VZ_RED}">${fmt(d.ga)}</span></div>
+        <div class="popup-row"><span class="popup-lbl">Charter Cable:</span><span class="popup-val" style="color:${CHTR_BLUE}">${fmt(d.gb)}</span></div>
+        <div class="popup-row"><span class="popup-lbl">Overlap Rate:</span><span class="popup-val">${rate}%</span></div>
+      `);
+    }
+  }).addTo(map);
+}
+
+// ================================================================
+// METRO MAPS — block group detail
+// ================================================================
+let metroMaps = {};     // id -> L.map
+let metroLoaded = {};   // id -> { countyFips -> layer }
+let metroLoadingCount = {};
+
+function buildMetroMaps() {
+  const container = document.getElementById('metro-maps');
+  METROS.forEach(metro => {
+    const ovl = metroOverlap(metro.countyFips);
+    const section = document.createElement('div');
+    section.className = 'metro-section';
+    section.innerHTML = `
+      <div class="metro-header">
+        <div class="metro-title">${metro.title}</div>
+        <div class="metro-stats">
+          <span style="color:${OVL_ORANGE}">${fmtK(ovl)} overlap BSLs</span> &mdash;
+          <span style="color:${OVL_ORANGE}">${fmtK(Math.round(ovl*0.93))} ~households</span> &mdash;
+          ${metro.countyFips.length} counties
+        </div>
+      </div>
+      <div style="position:relative">
+        <div class="metro-map" id="map-${metro.id}"></div>
+        <div class="map-loading" id="loading-${metro.id}">Loading block groups...</div>
+      </div>
+      <div class="metro-note">${metro.note}</div>
+    `;
+    container.appendChild(section);
+  });
+}
+
+function initMetroMaps() {
+  METROS.forEach(metro => {
+    const map = L.map('map-'+metro.id, {preferCanvas:true, zoomControl:true}).setView(metro.center, metro.zoom);
+    L.tileLayer(TILE_URL, TILE_OPTS).addTo(map);
+    map.createPane('bgPane');
+    map.getPane('bgPane').style.zIndex = 420;
+
+    metroMaps[metro.id] = map;
+    metroLoaded[metro.id] = {};
+    metroLoadingCount[metro.id] = 0;
+
+    // Add state outlines if we have the geo cache
+    if (stateGeoCache) {
+      addStateFootprintToMetro(map);
+    }
+
+    // Mini summary table (top-right) — replaces county bubbles
+    const summaryCtrl = L.control({position:'topright'});
+    summaryCtrl.onAdd = function() {
+      const div = L.DomUtil.create('div','');
+      div.style.cssText = 'background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;box-shadow:0 2px 6px rgba(0,0,0,0.1);font-size:0.62rem;max-height:280px;overflow-y:auto;min-width:180px';
+      let rows = '';
+      let totO=0, totA=0, totB=0;
+      metro.countyFips.forEach(fips => {
+        const c = COUNTIES.find(x=>x.f===fips);
+        if (!c) return;
+        const rate = c.a>0?(c.o/c.a*100).toFixed(0):'--';
+        totO+=c.o; totA+=c.a; totB+=c.b;
+        rows += '<tr><td style="padding:1px 4px;white-space:nowrap">'+c.n+'</td><td style="padding:1px 4px;text-align:right;color:'+OVL_ORANGE+';font-weight:600">'+fmtK(c.o)+'</td><td style="padding:1px 4px;text-align:right;color:'+VZ_RED+'">'+fmtK(c.a)+'</td><td style="padding:1px 4px;text-align:right;color:'+CHTR_BLUE+'">'+fmtK(c.b)+'</td><td style="padding:1px 4px;text-align:right">'+rate+'%</td></tr>';
+      });
+      const totRate = totA>0?(totO/totA*100).toFixed(0):'--';
+      div.innerHTML = '<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.4px;color:#374151;margin-bottom:4px">County Overlap Summary</div>'+
+        '<table style="width:100%;border-collapse:collapse;font-size:0.6rem;font-variant-numeric:tabular-nums"><thead><tr style="border-bottom:1px solid #e5e7eb"><th style="padding:1px 4px;text-align:left;color:#9ca3af;font-weight:600">County</th><th style="padding:1px 4px;text-align:right;color:'+OVL_ORANGE+'">Ovlp</th><th style="padding:1px 4px;text-align:right;color:'+VZ_RED+'">VZ</th><th style="padding:1px 4px;text-align:right;color:'+CHTR_BLUE+'">CHTR</th><th style="padding:1px 4px;text-align:right">%</th></tr></thead><tbody>'+rows+
+        '<tr style="border-top:1.5px solid #374151;font-weight:700"><td style="padding:2px 4px">Total</td><td style="padding:2px 4px;text-align:right;color:'+OVL_ORANGE+'">'+fmtK(totO)+'</td><td style="padding:2px 4px;text-align:right;color:'+VZ_RED+'">'+fmtK(totA)+'</td><td style="padding:2px 4px;text-align:right;color:'+CHTR_BLUE+'">'+fmtK(totB)+'</td><td style="padding:2px 4px;text-align:right">'+totRate+'%</td></tr>'+
+        '</tbody></table>';
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      return div;
+    };
+    summaryCtrl.addTo(map);
+
+    addLegend(map);
+
+    // Auto-load block groups for all counties in this metro
+    loadMetroBGs(metro);
+  });
+}
+
+function addStateFootprintToMetro(map) {
+  // VZ fill — visible but not overwhelming over block groups
+  L.geoJSON(stateGeoCache, {
+    style: function(feature) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.ga <= 0) return {fillOpacity:0, weight:0.3, opacity:0.1, color:'#e5e7eb'};
+      return { color:VZ_RED, fillColor:VZ_FILL, fillOpacity:0.18, weight:1.2, opacity:0.35 };
+    }
+  }).addTo(map);
+  // Charter fill — visible but not overwhelming over block groups
+  L.geoJSON(stateGeoCache, {
+    style: function(feature) {
+      const abbr = ST_ABBR[feature.properties.name];
+      const d = abbr && BY_STATE[abbr];
+      if (!d || d.gb <= 0) return {fillOpacity:0, weight:0, opacity:0};
+      return { color:CHTR_BLUE, fillColor:CHTR_FILL, fillOpacity:0.15, weight:1.2, opacity:0.3 };
+    }
+  }).addTo(map);
+}
+
+function loadMetroBGs(metro) {
+  if (typeof BG_BY_COUNTY === 'undefined' || Object.keys(BG_BY_COUNTY).length === 0) return;
+
+  let delay = 0;
+  metro.countyFips.forEach(fips => {
+    if (!BG_BY_COUNTY[fips]) return;
+    const c = COUNTIES.find(x=>x.f===fips);
+    if (!c) return;
+
+    setTimeout(function() {
+      fetchMetroBGs(metro.id, fips, c.n, c.s);
+    }, delay);
+    delay += 250;
+  });
+}
+
+function fetchMetroBGs(metroId, countyFips, countyName, stateAbbr) {
+  var stateFips = countyFips.substring(0, 2);
+  var countyCode = countyFips.substring(2, 5);
+
+  var url = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/10/query';
+  var params = 'where=' + encodeURIComponent("STATE='" + stateFips + "' AND COUNTY='" + countyCode + "'") +
+    '&outFields=GEOID,AREALAND&outSR=4326&f=geojson&returnGeometry=true';
+
+  metroLoadingCount[metroId] = (metroLoadingCount[metroId]||0) + 1;
+  var loadEl = document.getElementById('loading-'+metroId);
+  if (loadEl) loadEl.style.display = 'block';
+
+  fetch(url + '?' + params)
+    .then(function(r) { return r.json(); })
+    .then(function(geojson) {
+      renderMetroBGs(metroId, countyFips, countyName, stateAbbr, geojson);
+    })
+    .catch(function(err) {
+      console.warn('Failed BG load ' + countyFips + ': ' + err);
+    })
+    .finally(function() {
+      metroLoadingCount[metroId]--;
+      if (metroLoadingCount[metroId] <= 0) {
+        metroLoadingCount[metroId] = 0;
+        if (loadEl) loadEl.style.display = 'none';
+      }
+    });
+}
+
+function renderMetroBGs(metroId, countyFips, countyName, stateAbbr, geojson) {
+  var map = metroMaps[metroId];
+  if (!map) return;
+  var features = (geojson && geojson.features) || [];
+  var bgIds = BG_BY_COUNTY[countyFips] || [];
+  var bgIdSet = {};
+  bgIds.forEach(function(id) { bgIdSet[id] = true; });
+
+  var relevant = features.filter(function(f) {
+    return f.properties && f.properties.GEOID && bgIdSet[f.properties.GEOID];
+  });
+
+  for (var i = 0; i < relevant.length; i++) {
+    var feature = relevant[i];
+    var bgId = feature.properties.GEOID;
+    var data = BG_OVERLAP[bgId];
+    if (!data) continue;
+
+    var intensity = Math.min(0.6, 0.15 + Math.log10(Math.max(1, data.o)) * 0.13);
+    var rate = data.a > 0 ? (data.o / data.a * 100).toFixed(1) : '0';
+
+    try {
+      (function(bgId, data, intensity, rate) {
+        L.geoJSON(feature, {
+          pane: 'bgPane',
+          interactive: true,
+          style: {
+            color: '#9a3412',
+            fillColor: OVL_FILL,
+            fillOpacity: intensity,
+            weight: 0.5,
+            opacity: 0.4
+          },
+          onEachFeature: function(feat, layer) {
+            layer.bindPopup(
+              '<div class="popup-hdr" style="color:' + OVL_ORANGE + '">Block Group ' + bgId + '</div>' +
+              '<div style="font-size:0.68rem;color:#6b7280;margin-bottom:6px">' + countyName + ' County, ' + stateAbbr + '</div>' +
+              '<div class="popup-row"><span class="popup-lbl">Overlap BSLs:</span><span class="popup-val" style="color:' + OVL_ORANGE + '">' + fmt(data.o) + '</span></div>' +
+              '<div class="popup-row"><span class="popup-lbl">VZ Fiber BSLs:</span><span class="popup-val" style="color:' + VZ_RED + '">' + fmt(data.a) + '</span></div>' +
+              '<div class="popup-row"><span class="popup-lbl">Charter Cable BSLs:</span><span class="popup-val" style="color:' + CHTR_BLUE + '">' + fmt(data.b) + '</span></div>' +
+              '<div class="popup-row"><span class="popup-lbl">Overlap Rate:</span><span class="popup-val">' + rate + '%</span></div>' +
+              '<div class="popup-row"><span class="popup-lbl">~Households:</span><span class="popup-val">' + fmt(Math.round(data.o*0.93)) + '</span></div>'
+            , {autoPan:true, maxWidth:280});
+            layer.on('mouseover', function() { this.setStyle({weight:2, fillOpacity:Math.min(0.75, intensity+0.2), color:OVL_ORANGE}); });
+            layer.on('mouseout', function() { this.setStyle({weight:0.5, fillOpacity:intensity, color:'#9a3412'}); });
+          }
+        }).addTo(map);
+      })(bgId, data, intensity, rate);
+    } catch(err) {}
+  }
+}
+
+// ================================================================
+// INIT
+// ================================================================
+renderStrip();
+renderCallout();
+renderExhibit();
+renderStateTable();
+renderPairs();
+renderMeth();
+renderFootnotes();
+buildMetroMaps();
+initNationalMap();
+
+// Wait for state geo to load before initializing metro maps
+function waitAndInitMetros() {
+  if (stateGeoCache) {
+    initMetroMaps();
+  } else {
+    setTimeout(waitAndInitMetros, 300);
+  }
+}
+waitAndInitMetros();
+</script>
+</body>
+</html>
